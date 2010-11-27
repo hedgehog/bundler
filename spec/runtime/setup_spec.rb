@@ -185,7 +185,7 @@ describe "Bundler.setup" do
           end
         R
 
-        out.should == "WIN"
+        out.should match /\nWIN\Z/
       end
 
       it "version_requirement is now deprecated in rubygems 1.4.0+ when gem is missing" do
@@ -211,7 +211,7 @@ describe "Bundler.setup" do
           end
         R
 
-        out.should == "WIN"
+        out.should match /\nWIN\Z/
       end
 
       it "version_requirement is now deprecated in rubygesm 1.4.0+  when the version is wrong" do
@@ -239,14 +239,14 @@ describe "Bundler.setup" do
 
       it "removes system gems from Gem.source_index" do
         run "require 'yard'"
-        out.should == "bundler-#{Bundler::VERSION}\nyard-1.0"
+        out.should match /\nbundler-#{Bundler::VERSION}\nyard-1.0\Z/
       end
 
       context "when the ruby stdlib is a substring of Gem.path" do
         it "does not reject the stdlib from $LOAD_PATH" do
           substring = "/" + $LOAD_PATH.find{|p| p =~ /vendor_ruby/ }.split("/")[2]
           run "puts 'worked!'", :env => {"GEM_PATH" => substring}
-          out.should == "worked!"
+          out.should match /\nworked!\Z/
         end
       end
     end
@@ -267,7 +267,7 @@ describe "Bundler.setup" do
       G
 
       run "require 'rack'"
-      out.should == "WIN"
+      out.should match /\nWIN\Z/
     end
   end
 
@@ -302,7 +302,7 @@ describe "Bundler.setup" do
         end
       R
 
-      out.should == "WIN"
+      out.should match /WIN/
     end
 
     it "provides a good exception if the lockfile is unavailable" do
@@ -509,7 +509,7 @@ describe "Bundler.setup" do
     G
 
     run "require 'rq'"
-    out.should == "yay"
+    out.should match /\nyay\Z/
   end
 
   it "ignores Gem.refresh" do
@@ -525,7 +525,7 @@ describe "Bundler.setup" do
       puts Gem.source_index.find_name("rack").inspect
     R
 
-    out.should == "[]"
+    out.should match /\n[]\Z/
   end
 
   describe "with git gems that don't have gemspecs" do
@@ -543,7 +543,7 @@ describe "Bundler.setup" do
         puts NOGEMSPEC
       R
 
-      out.should == "1.0"
+      out.should match /1.0/
     end
   end
 
@@ -569,7 +569,7 @@ describe "Bundler.setup" do
         end
       R
 
-      out.should == "WIN"
+      out.should match /\nWIN\Z/
     end
 
     it "provides a gem method" do
@@ -579,7 +579,7 @@ describe "Bundler.setup" do
         puts ACTIVESUPPORT
       R
 
-      out.should == "2.3.5"
+      out.should match /\n2.3.5\Z/
     end
 
     it "raises an exception if gem is used to invoke a system gem not in the bundle" do
@@ -645,7 +645,7 @@ describe "Bundler.setup" do
     it "evals each gemspec in the context of its parent directory" do
       bundle :install
       run "require 'bar'; puts BAR"
-      out.should == "1.0"
+      out.should match /1.0/
     end
 
     it "error intelligently if the gemspec has a LoadError" do
