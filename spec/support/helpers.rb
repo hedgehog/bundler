@@ -111,6 +111,13 @@ module Spec
       config
     end
 
+    def clean_config
+      tpath = FileUtils.rm_rf(tmp('.bundle/config'))
+      lpath = FileUtils.rm_rf(bundled_app('.bundle/config'))
+      gpath = FileUtils.rm_rf(home('.bundle/config'))
+      tpath || lpath || gpath
+    end
+
     def gemfile(*args)
       path = bundled_app("Gemfile")
       path = args.shift if Pathname === args.first
@@ -138,6 +145,7 @@ module Spec
     def install_gemfile(*args)
       gemfile(*args)
       opts = args.last.is_a?(Hash) ? args.last : {}
+      opts['verbose'] = true
       bundle :install, opts
     end
 
