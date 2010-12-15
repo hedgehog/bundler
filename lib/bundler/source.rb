@@ -518,7 +518,7 @@ module Bundler
 
       def decorate?
         if cached? && initial_install?
-           $stderr.puts "Init. new URI: #{Bundler.install_path}/#{name} Dir exists?: #{Dir.exist?("#{Bundler.install_path}/#{name}")}"
+          # $stderr.puts "Init. new URI: #{Bundler.install_path}/#{name} Dir exists?: #{Dir.exist?("#{Bundler.install_path}/#{name}")}"
           if Dir.exist?("#{Bundler.install_path}/#{name}")
             @options['uri'] = "#{Bundler.install_path}/#{name}"
           end
@@ -573,7 +573,7 @@ module Bundler
           # @options['decorate'] = @decorate
         else
           @decorate = @options['git_decorate']
-          $stderr.puts "Decorate set to: #{@decorate}"
+          # $stderr.puts "Decorate set to: #{@decorate}"
         end
         @decorate
       end
