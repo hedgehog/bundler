@@ -134,7 +134,7 @@ module Bundler
       end
 
       def decorate?
-        #true
+        true
       end
 
     private
@@ -407,7 +407,7 @@ module Bundler
       end
 
       def decorate?
-        #true
+        true
       end
 
     private
@@ -470,7 +470,7 @@ module Bundler
         @ref        = options["ref"] || options["branch"] || options["tag"] || 'master'
         @revision   = options["revision"]
         @submodules = options["submodules"]
-        @decorate   = ( options["decorate"].kind_of?(FalseClass) || options["git_decorate"].kind_of?(FalseClass) ) ? false : true
+        @decorate   = options["decorate"].kind_of?(FalseClass) || options["git_decorate"].kind_of?(FalseClass) ? false : true
         @overwrite  = options["overwrite"].kind_of?(FalseClass) ? false : true  # TODO Maybe - currently no spec fails without this...
         @update     = false
       end
