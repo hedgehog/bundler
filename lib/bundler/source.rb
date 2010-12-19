@@ -481,6 +481,7 @@ module Bundler
 
       def to_lock
         out = "GIT\n"
+        out << "  folder: #{path}\n"
         out << "  remote: #{@uri}\n"
         out << "  revision: #{revision}\n"
         %w(ref branch tag submodules).each do |opt|
