@@ -224,7 +224,7 @@ module Bundler
       Bundler.load.cache if Bundler.root.join("vendor/cache").exist? && !options["no-cache"]
 
       if Bundler.settings[:path]
-        relative_path = Bundler.settings[:path]
+        relative_path = Bundler.settings[:install_path] ? Bundler.settings[:install_path] : Bundler.settings[:path]
         relative_path = "./" + relative_path unless relative_path[0] == ?/
         Bundler.ui.confirm "Your bundle is complete! " +
           "It was installed into #{relative_path}"
