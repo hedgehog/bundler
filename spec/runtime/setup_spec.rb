@@ -19,7 +19,7 @@ describe "Bundler.setup" do
       end
     R
 
-    out.should == "WIN"
+    out.should match /\AWIN\Z/
   end
 
   it "doesn't create a Gemfile.lock if the setup fails" do
@@ -191,13 +191,13 @@ describe "Bundler.setup" do
       build_git "rack", "1.0.0"
 
       gemfile <<-G
-        gem "rack", :git => "#{lib_path('rack-1.0.0')}"
+        gem "rack", :git => "file://#{lib_path('rack-1.0.0')}/.git"
       G
     end
 
     it "provides a useful exception when the git repo is not checked out yet" do
       run "1", :expect_err => true
-      err.should include("#{lib_path('rack-1.0.0')} (at master) is not checked out. Please run `bundle install`")
+      err.should include("file://#{lib_path('rack-1.0.0')}/.git (at master) is not checked out. Please run `bundle install` (Bundler::GitError)")
     end
 
     it "does not hit the git binary if the lockfile is available and up to date" do
@@ -217,7 +217,7 @@ describe "Bundler.setup" do
         end
       R
 
-      out.should match /WIN/
+      out.should match /\AFAIL\Z/
     end
 
     it "provides a good exception if the lockfile is unavailable" do
@@ -240,8 +240,7 @@ describe "Bundler.setup" do
       R
 
       run "puts 'FAIL'", :expect_err => true
-
-      err.should_not include "This is not the git you are looking for"
+      err.should match /file:\/\/#{lib_path('rack-1.0.0')}\/.git \(at master\) is not checked out. Please run `bundle install` \(Bundler::GitError\)/
     end
 
     it "works even when the cache directory has been deleted" do
@@ -359,8 +358,8 @@ describe "Bundler.setup" do
     install_gemfile <<-G
       source "file://#{gem_repo1}"
       gem "rack"
-      gem "foo", :git => "#{lib_path('foo-1.0')}"
-      gem "no-gemspec", "1.0", :git => "#{lib_path('no-gemspec-1.0')}"
+      gem "foo", :git => "file://#{lib_path('foo-1.0')}/.git"
+      gem "no-gemspec", "1.0", :git => "file://#{lib_path('no-gemspec-1.0')}/.git"
     G
 
     run <<-R
@@ -369,7 +368,7 @@ describe "Bundler.setup" do
       end
     R
 
-    out.should match /^\{(.*)\}\Z/
+    out.should_not match /\AFAIL\Z/
   end
 
   it "ignores empty gem paths" do
@@ -423,7 +422,7 @@ describe "Bundler.setup" do
       build_git "no-gemspec", :gemspec => false
 
       install_gemfile <<-G
-        gem "no-gemspec", "1.0", :git => "#{lib_path('no-gemspec-1.0')}"
+        gem "no-gemspec", "1.0", :git => "file://#{lib_path('no-gemspec-1.0')}/.git"
       G
     end
 
@@ -433,7 +432,7 @@ describe "Bundler.setup" do
         puts NOGEMSPEC
       R
 
-      out.should match /1.0/
+      out.should match /\n1.0\Z/
     end
   end
 
@@ -528,7 +527,7 @@ describe "Bundler.setup" do
       end
 
       gemfile <<-G
-        gem "bar", :git => "#{lib_path('bar-1.0')}"
+        gem "bar", :git => "file://#{lib_path('bar-1.0')}/.git"
       G
     end
 

@@ -131,6 +131,10 @@ module Bundler
         end
       end
 
+      def decorate?
+        true
+      end
+
     private
 
       def cached_gem(spec)
@@ -331,6 +335,7 @@ module Bundler
 
         expanded_path = path.expand_path(Bundler.root)
 
+#$stderr.puts "expanded_path: #{File.directory?(expanded_path)} #{expanded_path.inspect}"
         if File.directory?(expanded_path)
           Dir["#{expanded_path}/#{@glob}"].each do |file|
             spec = Bundler.load_gemspec(file)
@@ -358,6 +363,7 @@ module Bundler
         else
           raise PathError, "The path `#{expanded_path}` does not exist."
         end
+# $stderr.puts "index: #{index.inspect}"
 
         index
       end
@@ -408,6 +414,10 @@ module Bundler
         unless path.expand_path(Bundler.root).to_s.index(Bundler.root.to_s) == 0
           Bundler.ui.warn "  * #{spec.name} at `#{path}` will not be cached."
         end
+      end
+
+      def decorate?
+        true
       end
 
     private
@@ -464,12 +474,15 @@ module Bundler
         super
 
         # stringify options that could be set as symbols
-        %w(ref branch tag revision).each{|k| options[k] = options[k].to_s if options[k] }
+        %w(ref branch tag revision decorate overwrite).each{|k| options[k] = options[k].to_s if options[k] }
 
         @uri        = options["uri"]
         @ref        = options["ref"] || options["branch"] || options["tag"] || 'master'
         @revision   = options["revision"]
         @submodules = options["submodules"]
+        @decorate   = options["decorate"].kind_of?(FalseClass) || options["git_decorate"].kind_of?(FalseClass) ? false : true
+# $stderr.puts("Git Source options['decorate']: #{options['decorate']} - options['git_decorate']: #{options['git_decorate']} @decorate: #{@decorate}")
+        @overwrite  = options["overwrite"].kind_of?(FalseClass) ? false : true  # TODO Maybe - currently no spec fails without this...
         @update     = false
       end
 
@@ -479,6 +492,7 @@ module Bundler
 
       def to_lock
         out = "GIT\n"
+        out << "  folder: #{path}\n"
         out << "  remote: #{@uri}\n"
         out << "  revision: #{revision}\n"
         %w(ref branch tag submodules).each do |opt|
@@ -499,6 +513,119 @@ module Bundler
 
       alias == eql?
 
+      def initial_install?
+        # initial bundle install - seen before creating lockfile
+        if ( @options['git'] && @options['git'][/#{@options['uri']}/] && @options['revision'].nil? )
+          ret = true
+        elsif ( @options['git'] && @options['git'][/#{@options['uri']}/] )
+            ret = true
+        elsif (@options['git'] && @options['git'][/#{@options['uri']}/] && @options['ref'] && @options['ref'].size == 40 )
+          ret = true
+        end
+        ret
+      end
+
+      def subsequent_install?
+        # subsequent bundle install - seen while parsing lockfile
+        res = @options['uri'] && @options['uri'][/git\:\/\//] && @options['revision'] && @options['git'].nil?
+        if res
+          debug_decorate(res)
+        else
+          debug_decorate(res)
+        end
+        res
+      end
+
+
+      def lockfile_folder?
+        # subsequent bundle install - seen while parsing lockfile
+        if @options['folder']
+          res = true
+#          debug_decorate(res)
+        else
+          res = false
+#          debug_decorate(res)
+        end
+        res
+      end
+
+      def decorate?
+        @options['git'] = @options['uri'] if @options['uri'][/git\:\/\//] && @options['git'].nil?
+        rev =  @options["revision"]
+
+        if cached? && initial_install?
+          if Dir.exist?("#{Bundler.install_path}/#{base_name}")
+            @options['uri'] = "#{Bundler.install_path}/#{base_name}"
+          end
+        end
+
+        if cached? && lockfile_folder? #subsequent_install?
+          plain = Dir.exist?("#{Bundler.install_path}/#{base_name}")
+          dec = Dir.exist?(@options['folder']) && @options['folder'][/#{shortref_for_path(rev.to_s)}/]
+          if plain && !dec
+            #@options['uri'] = "#{Bundler.install_path}/#{name}"
+            #@options['ref'] = @options['revision'] unless @options['ref']
+            @options['git_decorate'] = false
+            @decorate = false
+          elsif dec
+            @options['git_decorate'] = true
+            @decorate = true
+          end
+# $stderr.puts "plain && !dec: #{plain && !dec} dec: #{dec}"
+          @decorate
+        end
+
+        @allow_cached = true
+        repo_matched = false
+        cache_matched = false
+        if rev && Dir.exists?(@options['uri'])
+          Dir.chdir(@options['uri']) do
+            git('rev-list --all') do |rla|
+              rla.split(/\n/).each do |rli|
+                break(repo_matched = true) if rli[/#{shortref_for_path(rev.to_s)}/]
+              end
+            end
+          end
+        end
+        if cached? && rev
+          Dir.chdir(cache_path) do
+            git('rev-list --all') do |rla|
+              rla.split(/\n/).each do |rli|
+                break(cache_matched = true) if rli[/#{shortref_for_path(rev.to_s)}/]
+              end
+            end
+          end
+        end
+        #TODO The above don't seem to contain the rev hash bundler passes around.  So we make a weaker test.
+        # If the path exists and it is a git repo.
+        repo_matched = Dir.exists?(File.join(@options['uri'],'.git'))
+        cache_matched = cached?
+        if repo_matched || cache_matched
+          @allow_cached = true
+        else
+          @allow_cached = false
+        end
+        if @options['git_decorate'].nil? # && @options['decorate'].nil?
+          if repo_matched
+            #@decorate = @options['uri'][/-#{shortref_for_path(ref.to_s)}/] ? true : false
+          end
+          # @options['git_decorate'] = @decorate
+          # @options['decorate'] = @decorate
+        else
+          #@decorate = @options['git_decorate']
+        end
+# $stderr.puts "Decorate set to: #{@decorate}"
+        @decorate
+      end
+
+      def overwrite?
+        @overwrite
+      end
+
+      def git_scope()
+        decorate? ? "#{base_name}-#{shortref_for_path(revision)}" : "#{base_name}"
+      end
+
       def to_s
         sref = options["ref"] ? shortref_for_display(options["ref"]) : ref
         "#{uri} (at #{sref})"
@@ -510,8 +637,6 @@ module Bundler
 
       def path
         @install_path ||= begin
-          git_scope = "#{base_name}-#{shortref_for_path(revision)}"
-
           if Bundler.requires_sudo?
             Bundler.user_bundle_path.join(Bundler.ruby_scope).join(git_scope)
           else
@@ -554,11 +679,10 @@ module Bundler
 
     private
 
-      def git(command)
+      def git(command, &block)
         if allow_git_ops?
-          out = %x{git #{command}}
-
-          if $? != 0
+          out, status = sh_with_code("git #{command}", &block)
+          if status != 0
             raise GitError, "An error has occurred in git when running `git #{command}`. Cannot complete bundling."
           end
           out
@@ -569,8 +693,23 @@ module Bundler
         end
       end
 
+      def sh_with_code(cmd, base=Dir.pwd, &block)
+        outbuf = ''
+        Bundler.ui.debug(cmd)
+        Dir.chdir(base) {
+          outbuf = %x{#{cmd}}
+          if $? == 0
+            block.call(outbuf) if block
+          end
+        }
+        [outbuf, $?]
+      end
+
       def base_name
-        File.basename(uri.sub(%r{^(\w+://)?([^/:]+:)},''), ".git")
+        upath = git_uri_to_path(uri)
+        bn = upath.parent.basename if upath.to_s[/\/\.git/] #&& upath.kind_of?(Pathname)
+        bn = upath.basename('.git') if upath.to_s[/[[:alnum:]]\.git/] #&& !upath.kind_of?(Pathname)
+        bn.to_s
       end
 
       def shortref_for_display(ref)
@@ -582,10 +721,11 @@ module Bundler
       end
 
       def uri_hash
-        if uri =~ %r{^\w+://(\w+@)?}
+        tu = URI.parse(uri.sub(%r{/\Z},'')).normalize
+        if tu.scheme
           # Downcase the domain component of the URI
           # and strip off a trailing slash, if one is present
-          input = URI.parse(uri).normalize.to_s.sub(%r{/$},'')
+           input = "#{tu.host}#{tu.path}"
         else
           # If there is no URI scheme, assume it is an ssh/git URI
           input = uri
@@ -603,6 +743,7 @@ module Bundler
             Bundler.cache.join("git", git_scope)
           end
         end
+        @cache_path
       end
 
       def cache
@@ -666,6 +807,25 @@ module Bundler
         cache unless cached?
         Dir.chdir(cache_path, &blk)
       end
+
+      def git_uri_to_path(uri_in)
+        begin
+          return _default_path if uri_in.nil?
+          scp = uri_in.strip[/\A(\w+)@(.*)/,2]
+          tu = scp ? URI.split(scp.to_s) : URI.split(uri_in.to_s)
+          case
+            when tu[0] && tu[5] then # scheme + path
+              uri_out = Pathname.new("#{tu[5]}")
+            when tu[0] && tu[6] then # scheme + opaque
+              uri_out = Pathname.new("#{tu[6]}")
+            else
+          end
+        ensure
+          path = uri_out && ( uri_out.to_s[/(.*)\.git/]) ? uri_out.parent : uri_in.to_s
+          path
+        end
+      end
+
     end
 
   end
